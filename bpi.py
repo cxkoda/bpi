@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from configobj import ConfigObj
 import time
 import os, platform
