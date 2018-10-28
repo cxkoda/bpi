@@ -1,76 +1,127 @@
 #!/usr/bin/env python3
 
 from configobj import ConfigObj
-import time
 import os, platform
 import requests
-
+import logging
+import time
 
 class bpi:
-    def __init__(self, config):
-        self.cfg = config
-        self.last_state = True
-        self.last_success = ''
-        self.state = ''
-        self.last_dc = ''
-        self.last_check = ''
-        self.log = open(self.cfg['bpi']['log'], 'a')
-        if platform.system() == 'Linux':
-            self.sys_ping = lambda adress: os.system('ping -c 1 -W 1 ' + adress + ' > /dev/null')
-            self.cls = lambda: os.system('clear')
-        if platform.system() == 'Windows':
-            self.sys_ping = lambda adress: os.system('PING ' + adress + ' -n 1 -w 1000 > NUL')
-            self.cls = lambda: os.system('cls')
-        else:
-            raise RuntimeError('OS not detected')
+    def __init__(self, cfgFile):
+        self.cfg = ConfigObj(cfgFile)
+        self.__set_logger()
+        self.__set_os_commands(platform.system())
+        self.__set_check_type(self.cfg['bpi']['check_type'])
 
-    def check_connection(self):
-        self.last_check = time.strftime('%H:%M:%S')
-        if self.sys_ping(cfg['bpi']['ping_adress']) == 0:
-            self.state = 'SUCCESSFUL'
-            if self.last_state == False:
-                self.log.write(time.strftime('%a %d-%m-%Y %H:%M:%S')+' -> Reconnected\n')
-                self.last_state = True
-            return True
+    def __set_logger(self):
+        # create logger
+        self.logger = logging.getLogger('bpi')
+        self.logger.setLevel(logging.DEBUG)
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(self.cfg['bpi']['log'])
+        fh.setLevel(logging.INFO)
+        # create console handler with a higher log level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        # create formatter and add it to the handlers
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+        # add the handlers to the logger
+        self.logger.addHandler(fh)
+        self.logger.addHandler(ch)
+
+    def __set_os_commands(self, os_name):
+        '''
+        sets some os specific commands
+        '''
+        if os_name == 'Linux':
+            self.sys_ping = lambda adress: os.system('ping -c 1 -W 1 ' + adress + ' > /dev/null')
+        elif os_name == 'Windows':
+            self.sys_ping = lambda adress: os.system('PING ' + adress + ' -n 1 -w 1000 > NUL')
         else:
-            self.state = 'FAILED'
-            if self.last_state == True:
-                self.log.write(time.strftime('%a %d-%m-%Y %H:%M:%S')+' -> Disconnected\n')
-                self.last_dc = time.strftime('%H:%M:%S')
-                self.last_state = False
-            return False
+            logging.error('OS not detected: ' + os_name + ' - falling back on linux')
+            self.__set_os_commands('Linux')
+
+    def __set_check_type(self, check_type):
+        '''
+        sets the connection check type
+        '''
+        if check_type == 'internal':
+            self.check_connection = self.check_connection_internal
+        elif check_type == 'external':
+            self.check_connection = self.check_connection_external
+        else:
+            logging.error('check_type not defined: ' + check_type + ' - falling back on external')
+            self.__set_check_type('external')
+
+    def check_connection_external(self):
+        '''
+        Checks if an internet connection can be established, i.e. if a ping is successful
+        preformance: 0.06s (authorized), 0.6s (not authorized)
+        :return: bool: connection established
+        '''
+
+        if self.sys_ping(self.cfg['bpi']['ping_adress']) == 0:
+            self.state = 'AUTHORIZED'
+        else:
+            self.state = 'NOT_AUTHORIZED'
+
+        return self.state == 'AUTHORIZED'
+
+    def check_connection_internal(self):
+        '''
+        Checks if an internet connection can be established, i.e. if the plug-inn client is authorized
+        preformance: 0.06s (authorized), 0.06s (not authorized)
+        :return: bool: connection established
+        '''
+
+        response = requests.get(self.cfg['plug-inn']['host'] + '/api/captiveportal/access/status/0/')
+        self.status = response.json()
+        self.state = self.status['clientState']
+
+        return self.state == 'AUTHORIZED'
 
     def send_credentials(self):
+        '''
+        Send the credentials to the pluginn portal
+        :return: bool: transmission success
+        '''
         try:
-            requests.post(cfg['plug-inn']['host'],
+            requests.post(self.cfg['plug-inn']['host'] + '/api/captiveportal/access/logon/0/',
                           data={
-                              'auth_user': cfg['plug-inn']['username'],
-                              'auth_pass': cfg['plug-inn']['password'],
-                              'accept': 'Anmelden'
+                              'user': self.cfg['plug-inn']['username'],
+                              'password': self.cfg['plug-inn']['password']
                           })
-            self.log.write('\t' + time.strftime('%H:%M:%S') + ' -> PlugInn-Credentials have been transmitted\n')
+            self.logger.info('plug-inn credentials have been sent')
             return True
         except requests.RequestException:
-            self.log.write('\t' + time.strftime('%H:%M:%S') + ' -> Unexpected Transmission Error!!!\n')
+            self.logger.error('Unexpected Transmission Error!')
             return False
 
     def start_watchdog(self):
+        '''
+        Start a predefined watchdog
+        '''
+        self.logger.info('Watchdog started')
+        has_connection = self.check_connection_external()
+        had_connection = has_connection
         while True:
-            has_connection = self.check_connection()
-            time.sleep(1)
+            has_connection = self.check_connection_external()
+            if has_connection and not had_connection:
+                self.logger.info('Reconnected')
+            if not has_connection and had_connection:
+                self.logger.info('Disconnected')
+
+            had_connection = has_connection
             if not has_connection:
                 self.send_credentials()
-                time.sleep(0.5)
-            self.cls()
-            print('Last Check: ' + self.last_check)
-            print('Last Disconnect: ' + self.last_dc)
-            print('CONNECTION INTEGRITY CHECK: ' + self.state)
 
+            time.sleep(int(self.cfg['bpi']['sleep_time']))
 
 
 if __name__ == '__main__':
-    cfg = ConfigObj('bpi.ini')
-    bpi_handler = bpi(cfg)
+    bpi_handler = bpi('bpi.ini')
     bpi_handler.start_watchdog()
 
 
