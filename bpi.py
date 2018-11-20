@@ -7,6 +7,15 @@ import logging
 import time
 
 class bpi:
+    class Decorators:
+        @classmethod
+        def _log_call(cls, func):
+            def func_wrapper(self, *args, **kwargs):
+                self.logger.debug('Calling: %s%s' % (func.__name__, args))
+                return func(self, *args, **kwargs)
+
+            return func_wrapper
+
     def __init__(self, cfgFile):
         self.cfg = ConfigObj(cfgFile)
         self.__set_logger()
@@ -31,6 +40,7 @@ class bpi:
         self.logger.addHandler(fh)
         self.logger.addHandler(ch)
 
+    @Decorators._log_call
     def __set_os_commands(self, os_name):
         '''
         sets some os specific commands
@@ -43,6 +53,7 @@ class bpi:
             logging.error('OS not detected: ' + os_name + ' - falling back on linux')
             self.__set_os_commands('Linux')
 
+    @Decorators._log_call
     def __set_check_type(self, check_type):
         '''
         sets the connection check type
@@ -55,6 +66,7 @@ class bpi:
             logging.error('check_type not defined: ' + check_type + ' - falling back on external')
             self.__set_check_type('external')
 
+    @Decorators._log_call
     def check_connection_external(self):
         '''
         Checks if an internet connection can be established, i.e. if a ping is successful
@@ -69,6 +81,7 @@ class bpi:
 
         return self.state == 'AUTHORIZED'
 
+    @Decorators._log_call
     def check_connection_internal(self):
         '''
         Checks if an internet connection can be established, i.e. if the plug-inn client is authorized
@@ -82,6 +95,7 @@ class bpi:
 
         return self.state == 'AUTHORIZED'
 
+    @Decorators._log_call
     def send_credentials(self):
         '''
         Send the credentials to the pluginn portal
@@ -99,6 +113,7 @@ class bpi:
             self.logger.error('Unexpected Transmission Error!')
             return False
 
+    @Decorators._log_call
     def start_watchdog(self):
         '''
         Start a predefined watchdog
