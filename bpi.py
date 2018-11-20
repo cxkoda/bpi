@@ -104,10 +104,10 @@ class bpi:
         Start a predefined watchdog
         '''
         self.logger.info('Watchdog started')
-        has_connection = self.check_connection_external()
+        has_connection = self.check_connection()
         had_connection = has_connection
         while True:
-            has_connection = self.check_connection_external()
+            has_connection = self.check_connection()
             if has_connection and not had_connection:
                 self.logger.info('Reconnected')
             if not has_connection and had_connection:
