@@ -108,10 +108,11 @@ class bpi:
         :return: bool: transmission success
         '''
         try:
-            requests.post(self.cfg['plug-inn']['host'] + '/api/captiveportal/access/logon/0/',
+            requests.post(self.cfg['plug-inn']['host'] + '/index.php?zone=test',
                           data={
-                              'user': self.cfg['plug-inn']['username'],
-                              'password': self.cfg['plug-inn']['password']
+                              'auth_user': self.cfg['plug-inn']['username'],
+                              'auth_pass': self.cfg['plug-inn']['password'],
+                              'accept': 'Anmelden'
                           })
             self.logger.info('plug-inn credentials have been sent')
             return True
