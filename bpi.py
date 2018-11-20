@@ -90,6 +90,12 @@ class bpi:
         '''
 
         response = requests.get(self.cfg['plug-inn']['host'] + '/api/captiveportal/access/status/0/')
+
+        if not response.ok:
+            self.logger.error('Internal connection check is not available: falling back to external')
+            self.__set_check_type('external')
+            return self.check_connection()
+
         self.status = response.json()
         self.state = self.status['clientState']
 
