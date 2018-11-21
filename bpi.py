@@ -5,16 +5,28 @@ import os, platform
 import requests
 import logging
 import time
+from functools import wraps
 
 class bpi:
     class Decorators:
         @classmethod
         def _log_call(cls, func):
-            def func_wrapper(self, *args, **kwargs):
+            @wraps(func)
+            def wrapped(self, *args, **kwargs):
                 self.logger.debug('Calling: %s%s' % (func.__name__, args))
                 return func(self, *args, **kwargs)
+            return wrapped
 
-            return func_wrapper
+        @classmethod
+        def _timed(cls, func):
+            @wraps(func)
+            def wrapped(self, *args, **kwargs):
+                start = time.time()
+                ret = func(self, *args, **kwargs)
+                end = time.time()
+                self.logger.debug('Time elapsed: %s' % (end - start))
+                return ret
+            return wrapped
 
     def __init__(self, cfgFile):
         self.cfg = ConfigObj(cfgFile)
@@ -67,6 +79,7 @@ class bpi:
             self.__set_check_type('external')
 
     @Decorators._log_call
+    @Decorators._timed
     def check_connection_external(self):
         '''
         Checks if an internet connection can be established, i.e. if a ping is successful
@@ -82,10 +95,11 @@ class bpi:
         return self.authorized
 
     @Decorators._log_call
+    @Decorators._timed
     def check_connection_internal(self):
         '''
         Checks if an internet connection can be established, i.e. if the plug-inn client is authorized
-        preformance: 0.06s (authorized), 0.06s (not authorized)
+        preformance: 0.03s (authorized), ?s (not authorized)
         :return: bool: connection authorized
         '''
 
@@ -101,6 +115,7 @@ class bpi:
         return self.authorized
 
     @Decorators._log_call
+    @Decorators._timed
     def send_credentials(self):
         '''
         Send the credentials to the pluginn portal
