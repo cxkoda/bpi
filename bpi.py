@@ -28,8 +28,9 @@ class bpi:
                 return ret
             return wrapped
 
-    def __init__(self, cfgFile):
+    def __init__(self, cfgFile, credFile):
         self.cfg = ConfigObj(cfgFile)
+        self.cred = ConfigObj(credFile)
         self.__set_logger()
         self.__set_os_commands(platform.system())
         self.__set_check_type(self.cfg['bpi']['check_type'])
@@ -124,8 +125,8 @@ class bpi:
         try:
             requests.post(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone',
                           data={
-                              'auth_user': self.cfg['plug-inn']['username'],
-                              'auth_pass': self.cfg['plug-inn']['password'],
+                              'auth_user': self.cred['credentials']['username'],
+                              'auth_pass': self.cred['credentials']['password'],
                               'accept': 'Anmelden'
                           })
             self.logger.info('plug-inn credentials have been sent')
@@ -157,7 +158,7 @@ class bpi:
 
 
 if __name__ == '__main__':
-    bpi_handler = bpi('bpi.ini')
+    bpi_handler = bpi('config.ini', 'credentials.ini')
     bpi_handler.start_watchdog()
 
 
