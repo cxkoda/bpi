@@ -89,15 +89,17 @@ class bpi:
         :return: bool: connection established
         '''
 
-        response = requests.get(self.cfg['plug-inn']['host'] + '/api/captiveportal/access/status/0/')
+        response = requests.get(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone')
 
         if not response.ok:
             self.logger.error('Internal connection check is not available: falling back to external')
             self.__set_check_type('external')
             return self.check_connection()
 
-        self.status = response.json()
-        self.state = self.status['clientState']
+        if response.text == 'You are connected.':
+            self.state = 'AUTHORIZED'
+        else:
+            self.state = 'NOT_AUTHORIZED'
 
         return self.state == 'AUTHORIZED'
 
@@ -108,7 +110,7 @@ class bpi:
         :return: bool: transmission success
         '''
         try:
-            requests.post(self.cfg['plug-inn']['host'] + '/index.php?zone=test',
+            requests.post(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone',
                           data={
                               'auth_user': self.cfg['plug-inn']['username'],
                               'auth_pass': self.cfg['plug-inn']['password'],
