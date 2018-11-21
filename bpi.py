@@ -71,22 +71,22 @@ class bpi:
         '''
         Checks if an internet connection can be established, i.e. if a ping is successful
         preformance: 0.06s (authorized), 0.6s (not authorized)
-        :return: bool: connection established
+        :return: bool: connection authorized
         '''
 
         if self.sys_ping(self.cfg['bpi']['ping_adress']) == 0:
-            self.state = 'AUTHORIZED'
+            self.authorized = True
         else:
-            self.state = 'NOT_AUTHORIZED'
+            self.authorized = False
 
-        return self.state == 'AUTHORIZED'
+        return self.authorized
 
     @Decorators._log_call
     def check_connection_internal(self):
         '''
         Checks if an internet connection can be established, i.e. if the plug-inn client is authorized
         preformance: 0.06s (authorized), 0.06s (not authorized)
-        :return: bool: connection established
+        :return: bool: connection authorized
         '''
 
         response = requests.get(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone')
@@ -96,12 +96,9 @@ class bpi:
             self.__set_check_type('external')
             return self.check_connection()
 
-        if response.text == 'You are connected.':
-            self.state = 'AUTHORIZED'
-        else:
-            self.state = 'NOT_AUTHORIZED'
+        self.authorized = (response.text == 'You are connected.')
 
-        return self.state == 'AUTHORIZED'
+        return self.authorized
 
     @Decorators._log_call
     def send_credentials(self):
