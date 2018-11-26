@@ -103,8 +103,11 @@ class bpi:
         preformance: 0.03s (authorized), ?s (not authorized)
         :return: bool: connection authorized
         '''
-
-        response = requests.get(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone')
+        try:
+            response = requests.get(self.cfg['plug-inn']['host'] + '/index.php?zone=cpzone')
+        except requests.RequestException:
+            self.logger.error('Unexpected Error: check_connection_internal::requests.get')
+            return self.authorized
 
         if not response.ok:
             self.logger.error('Internal connection check is not available: falling back to external')
